@@ -1,0 +1,13 @@
+Day 1: Data Validation and Problem Framing Summary
+============================================================
+
+dataset_shape: (253680, 22)
+total_rows: 253680
+total_columns: 22
+target_column: Diabetes_binary
+missing_values_total: 0
+duplicate_rows: 24206
+target_distribution: {0.0: 218334, 1.0: 35346}
+binary_columns_count: 15
+multi_category_columns_count: 4
+continuous_columns_count: 3
