@@ -84,7 +84,7 @@ The features include binary, ordinal, and continuous variables.
 
 ---
 
-## Day 1 Data Understanding
+## Data Understanding
 
 Initial data validation showed:
 
