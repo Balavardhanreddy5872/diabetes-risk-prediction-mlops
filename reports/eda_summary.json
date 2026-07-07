@@ -1,0 +1,73 @@
+{
+    "dataset_shape": [
+        253680,
+        22
+    ],
+    "total_rows": 253680,
+    "total_columns": 22,
+    "target_column": "Diabetes_binary",
+    "missing_values_total": 0,
+    "duplicate_rows": 24206,
+    "duplicate_percentage": 9.54,
+    "target_distribution": {
+        "0.0": 218334,
+        "1.0": 35346
+    },
+    "target_percentage": {
+        "0.0": 86.07,
+        "1.0": 13.93
+    },
+    "feature_groups": {
+        "binary_columns": [
+            "HighBP",
+            "HighChol",
+            "CholCheck",
+            "Smoker",
+            "Stroke",
+            "HeartDiseaseorAttack",
+            "PhysActivity",
+            "Fruits",
+            "Veggies",
+            "HvyAlcoholConsump",
+            "AnyHealthcare",
+            "NoDocbcCost",
+            "DiffWalk",
+            "Sex"
+        ],
+        "ordinal_columns": [
+            "GenHlth",
+            "Age",
+            "Education",
+            "Income"
+        ],
+        "continuous_count_columns": [
+            "BMI",
+            "MentHlth",
+            "PhysHlth"
+        ]
+    },
+    "top_positive_correlations_with_target": {
+        "GenHlth": 0.2936,
+        "HighBP": 0.2631,
+        "DiffWalk": 0.2183,
+        "BMI": 0.2168,
+        "HighChol": 0.2003,
+        "Age": 0.1774,
+        "HeartDiseaseorAttack": 0.1773,
+        "PhysHlth": 0.1713,
+        "Stroke": 0.1058,
+        "MentHlth": 0.0693
+    },
+    "top_negative_correlations_with_target": {
+        "Smoker": 0.0608,
+        "NoDocbcCost": 0.0314,
+        "Sex": 0.0314,
+        "AnyHealthcare": 0.0163,
+        "Fruits": -0.0408,
+        "Veggies": -0.0566,
+        "HvyAlcoholConsump": -0.0571,
+        "PhysActivity": -0.1181,
+        "Education": -0.1245,
+        "Income": -0.1639
+    }
+}
