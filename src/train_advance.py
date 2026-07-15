@@ -1,12 +1,15 @@
 import json
+import os
 import re
 import time
-from pathlib import Path
 from typing import Any
+
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import joblib
 import mlflow
 import mlflow.sklearn
 import pandas as pd
@@ -29,20 +32,26 @@ from sklearn.pipeline import Pipeline
 from sklearn.utils.class_weight import compute_sample_weight
 from xgboost import XGBClassifier
 
+from config import (
+    ADVANCED_RESULTS_PATH,
+    ALL_RESULTS_PATH,
+    BASELINE_RESULTS_PATH,
+    FIGURES_DIR,
+    FINAL_MODEL_METADATA_PATH,
+    FINAL_MODEL_PATH,
+    MLFLOW_TRACKING_URI,
+    MLRUNS_DIR,
+    PROCESSED_DATA_PATH,
+    RANDOM_STATE,
+    TARGET,
+    TEST_SIZE,
+)
 from data_preprocessing import build_preprocessor
 
 
-RANDOM_STATE = 42
-TARGET = "Diabetes_binary"
 EXPERIMENT_NAME = "diabetes-risk-advanced-models"
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DATA_PATH = PROJECT_ROOT / "data" / "processed" / "diabetes_no_duplicates.csv"
-BASELINE_RESULTS_PATH = PROJECT_ROOT / "reports" / "baseline_model_results.csv"
-ADVANCED_RESULTS_PATH = PROJECT_ROOT / "reports" / "advanced_model_results.csv"
-ALL_RESULTS_PATH = PROJECT_ROOT / "reports" / "all_model_comparison.csv"
-FIGURES_DIR = PROJECT_ROOT / "reports" / "figures" / "day4"
-MLRUNS_DIR = PROJECT_ROOT / "mlruns"
+DAY4_FIGURES_DIR = FIGURES_DIR / "day4"
 
 
 def slugify(value: str) -> str:
@@ -52,10 +61,10 @@ def slugify(value: str) -> str:
 
 def load_and_split_data():
     """Load the processed dataset and create the Day 3-compatible split."""
-    if not DATA_PATH.exists():
-        raise FileNotFoundError(f"Dataset not found: {DATA_PATH}")
+    if not PROCESSED_DATA_PATH.exists():
+        raise FileNotFoundError(f"Dataset not found: {PROCESSED_DATA_PATH}")
 
-    df = pd.read_csv(DATA_PATH)
+    df = pd.read_csv(PROCESSED_DATA_PATH)
 
     if TARGET not in df.columns:
         raise ValueError(f"Target column '{TARGET}' is missing from the dataset.")
@@ -68,7 +77,7 @@ def load_and_split_data():
     X_train, X_test, y_train, y_test = train_test_split(
         X,
         y,
-        test_size=0.20,
+        test_size=TEST_SIZE,
         random_state=RANDOM_STATE,
         stratify=y,
     )
@@ -91,9 +100,9 @@ def save_evaluation_artifacts(model_name: str, y_true, y_pred, metrics: dict[str
     """Save confusion matrix, classification report, and metrics files."""
     model_slug = slugify(model_name)
 
-    cm_path = FIGURES_DIR / f"{model_slug}_confusion_matrix.png"
-    report_path = FIGURES_DIR / f"{model_slug}_classification_report.json"
-    metrics_path = FIGURES_DIR / f"{model_slug}_metrics.json"
+    cm_path = DAY4_FIGURES_DIR / f"{model_slug}_confusion_matrix.png"
+    report_path = DAY4_FIGURES_DIR / f"{model_slug}_classification_report.json"
+    metrics_path = DAY4_FIGURES_DIR / f"{model_slug}_metrics.json"
 
     cm = confusion_matrix(y_true, y_pred, labels=[0, 1])
     fig, ax = plt.subplots(figsize=(6, 5))
@@ -267,7 +276,7 @@ def train_and_log_model(
                 "train_rows": len(X_train),
                 "test_rows": len(X_test),
                 "feature_count": X_train.shape[1],
-                "test_size": 0.20,
+                "test_size": TEST_SIZE,
                 "positive_class_threshold": 0.50,
             }
         )
@@ -301,6 +310,7 @@ def train_and_log_model(
         mlflow.sklearn.log_model(
             sk_model=pipeline,
             name="model",
+            serialization_format="cloudpickle",
             signature=signature,
             input_example=input_example,
         )
@@ -314,6 +324,7 @@ def train_and_log_model(
             "roc_auc": metrics["roc_auc"],
             "training_time_seconds": metrics["training_time_seconds"],
             "mlflow_run_id": run.info.run_id,
+            "pipeline": pipeline,
         }
 
     print(f"\nFinished training: {model_name}")
@@ -322,12 +333,39 @@ def train_and_log_model(
     return result
 
 
+def save_final_model(best_result: dict[str, Any]) -> None:
+    """Persist the selected best model for prediction and app serving."""
+    FINAL_MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    pipeline = best_result["pipeline"]
+    joblib.dump(pipeline, FINAL_MODEL_PATH)
+
+    metadata = {
+        "model": best_result["model"],
+        "selection_metric_order": ["recall", "roc_auc", "f1_score"],
+        "accuracy": best_result["accuracy"],
+        "precision": best_result["precision"],
+        "recall": best_result["recall"],
+        "f1_score": best_result["f1_score"],
+        "roc_auc": best_result["roc_auc"],
+        "training_time_seconds": best_result["training_time_seconds"],
+        "mlflow_run_id": best_result["mlflow_run_id"],
+        "model_path": str(FINAL_MODEL_PATH),
+    }
+
+    with FINAL_MODEL_METADATA_PATH.open("w", encoding="utf-8") as file:
+        json.dump(metadata, file, indent=2)
+
+    print(f"\nSaved final model to: {FINAL_MODEL_PATH}")
+    print(f"Saved final model metadata to: {FINAL_MODEL_METADATA_PATH}")
+
+
 def main():
     ADVANCED_RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    DAY4_FIGURES_DIR.mkdir(parents=True, exist_ok=True)
     MLRUNS_DIR.mkdir(parents=True, exist_ok=True)
 
-    mlflow.set_tracking_uri(MLRUNS_DIR.as_uri())
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     mlflow.set_experiment(EXPERIMENT_NAME)
 
     X_train, X_test, y_train, y_test = load_and_split_data()
@@ -372,10 +410,14 @@ def main():
         by=["recall", "roc_auc", "f1_score"],
         ascending=False,
     )
-    advanced_results.to_csv(ADVANCED_RESULTS_PATH, index=False)
+    best_result = advanced_results.iloc[0].to_dict()
+    save_final_model(best_result)
+
+    advanced_results_for_export = advanced_results.drop(columns=["pipeline"])
+    advanced_results_for_export.to_csv(ADVANCED_RESULTS_PATH, index=False)
 
     print("\nAdvanced model results:")
-    print(advanced_results.to_string(index=False))
+    print(advanced_results_for_export.to_string(index=False))
     print(f"\nSaved advanced results to: {ADVANCED_RESULTS_PATH}")
 
     if BASELINE_RESULTS_PATH.exists():
@@ -384,7 +426,7 @@ def main():
         baseline_results["training_time_seconds"] = pd.NA
         baseline_results["mlflow_run_id"] = pd.NA
 
-        advanced_for_comparison = advanced_results.copy()
+        advanced_for_comparison = advanced_results_for_export.copy()
         advanced_for_comparison["model_group"] = "advanced"
 
         all_results = pd.concat(

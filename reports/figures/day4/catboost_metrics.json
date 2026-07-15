@@ -4,5 +4,5 @@
   "recall": 0.7918506909816213,
   "f1_score": 0.4547351196563714,
   "roc_auc": 0.8206298347725526,
-  "training_time_seconds": 2.120072416961193
+  "training_time_seconds": 2.3290430000051856
 }
